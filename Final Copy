@@ -1,0 +1,250 @@
+#include <Arduino.h>
+
+#include <Servo.h>
+
+Servo myServo;
+
+#define MODE_BUTTON         0   // GPIO0  pin 27 for Push Button 1
+
+
+// Define the sensor pins
+int trig_pin = 12;
+int echo_pin = 13;
+
+// Define the servo pin
+int servo_pin = 4;
+
+//Define Retraction motor
+int ret1 = 2;
+int ret2 = 3;
+int ret3 = 6;
+int ret4 = 11;
+
+// Define Motor Pins
+int motor1 = 8;
+int motor2 = 7;
+int motor4 = 9;
+int motor3 = 10;
+int ENA = 5;
+int SPEED =220;
+int back_time=2000;
+
+//to intitialize process
+int state=0;
+int x=0;
+int crossingTime=6000;//Time it take to cross gap
+
+
+//servo code;
+int retraction=5000;
+int pos=0;
+
+
+
+void setup() {
+
+Serial.begin(115200);
+myServo.write(pos);
+pinMode(LED_BUILTIN, OUTPUT);  // set the LED pin as an output
+
+//retraction motor setup
+pinMode(ret1,OUTPUT);
+pinMode(ret2,OUTPUT);
+pinMode(ret3,OUTPUT);
+pinMode(ret4,OUTPUT);
+
+//servo setup
+myServo.attach (servo_pin);
+
+//Ultrasonic setup
+pinMode(trig_pin,OUTPUT);
+pinMode(echo_pin,INPUT);
+
+
+//motor setup
+pinMode(motor1,OUTPUT);
+pinMode(motor2,OUTPUT);
+pinMode(motor3,OUTPUT);
+pinMode(motor4,OUTPUT);
+pinMode(ENA,OUTPUT);// Tells the arduino that the ENA pin will give the output
+
+//led to setup
+pinMode(trig_pin,OUTPUT);
+}
+
+void loop() {
+   // Send a trigger signal to the sensor
+  digitalWrite(trig_pin, LOW);
+  delayMicroseconds(15);
+  digitalWrite(trig_pin, HIGH);
+  delayMicroseconds(15);
+  digitalWrite(trig_pin, LOW);
+
+  // Read the echo signal from the sensor
+  long duration = pulseIn(echo_pin, HIGH);
+
+  // Calculate the distance in centimeters
+  int distance = duration *0.034/ 2;
+
+  // Print the distance to the serial monitor
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+
+  if (distance <= 10 && x==0) {
+    state=1;
+    x=1;}
+
+    switch (state){
+       case 1:{//senses gap and stops
+         digitalWrite(motor1, HIGH);//motor 1 on
+         digitalWrite(motor2, LOW);
+         digitalWrite(motor3, HIGH);//motor 2 on
+         digitalWrite(motor4, LOW);
+         analogWrite(ENA,SPEED);
+
+           if (distance>=10){
+              digitalWrite(motor1, LOW);//Motor 1 OFF
+              digitalWrite(motor2, LOW);
+              digitalWrite(motor3, LOW);//Motor 2 OFF
+              digitalWrite(motor4, LOW);
+              analogWrite(ENA, 0);//speed of motors is set to 0
+
+              delay(2000);
+              state=2;
+              }
+
+      break;}
+
+      case 2:
+      {//crosses gap and stops and winds the bridge back
+        digitalWrite(trig_pin, LOW);
+        delayMicroseconds(15);
+        digitalWrite(trig_pin, HIGH);
+        delayMicroseconds(15);
+        digitalWrite(trig_pin, LOW);
+        
+        // Read the echo signal from the sensor
+         duration = pulseIn(echo_pin, HIGH);
+
+        // Calculate the distance in centimeters
+         distance = duration *0.034/ 2;
+
+        // Print the distance to the serial monitor
+        Serial.print("Distance: ");
+        Serial.print(distance);
+        Serial.println(" cm");
+
+         digitalWrite(motor2, HIGH);//motor 1 BACK
+         digitalWrite(motor1, LOW);
+         digitalWrite(motor4, HIGH);//motor 2 BACK
+         digitalWrite(motor3, LOW);
+         analogWrite(ENA, SPEED);
+         delay(500);
+         
+         digitalWrite(motor1, LOW); //Motor 1 OFF
+         digitalWrite(motor2, LOW);
+         digitalWrite(motor3, LOW);// Motor 2 OFF
+         digitalWrite(motor4, LOW);
+         analogWrite(ENA, 0);//speed of motors is set to 0
+
+         delay(1500);
+
+         myServo.write(210);
+         delay(4000); //delay before returning to normal position
+         myServo.write(pos);
+         delay(1500);  // delay before driving forward
+
+         digitalWrite(motor1, HIGH);//motor 1 FORWARD
+         digitalWrite(motor2, LOW);
+         digitalWrite(motor3, HIGH);//motor 2 FORWARD
+         digitalWrite(motor4, LOW);
+         analogWrite(ENA, SPEED);
+         delay(crossingTime);
+
+         digitalWrite(motor1, LOW);//motor 1 stop
+         digitalWrite(motor2, LOW);
+         digitalWrite(motor3, LOW);//motor 2 stop
+         digitalWrite(motor4, LOW);
+         analogWrite(ENA, 0);
+
+         digitalWrite(ret1, HIGH);//retraction 1
+         digitalWrite(ret2, LOW);
+         digitalWrite(ret3, HIGH);//retraction 2
+         digitalWrite(ret4, LOW);
+
+         delay(20000);
+
+         digitalWrite(ret1, LOW);//retraction 1
+         digitalWrite(ret2, LOW);
+         digitalWrite(ret3, LOW);//retraction 2
+         digitalWrite(ret4, LOW);
+         state=3;
+
+      break;}
+
+      case 3:
+      {
+
+      
+        digitalWrite(motor1, HIGH);//motor 1 FORWARD
+        digitalWrite(motor2, LOW);
+        digitalWrite(motor3, HIGH);//motor 2 FORWARD
+        digitalWrite(motor4, LOW);
+        analogWrite(ENA, SPEED);
+        digitalWrite(trig_pin, LOW);
+        delayMicroseconds(15);
+        digitalWrite(trig_pin, HIGH);
+        delayMicroseconds(15);
+        digitalWrite(trig_pin, LOW);
+        
+        // Read the echo signal from the sensor
+         duration = pulseIn(echo_pin, HIGH);
+
+        // Calculate the distance in centimeters
+         distance = duration *0.034/ 2;
+
+        // Print the distance to the serial monitor
+        Serial.print("Distance: ");
+        Serial.print(distance);
+        Serial.println(" cm");
+
+        if (distance>=10){
+              state=6;
+              digitalWrite(motor1, LOW);//
+              digitalWrite(motor2, LOW);
+              digitalWrite(motor3, LOW);// 2 off
+              digitalWrite(motor4, LOW);
+              analogWrite(ENA, 0);//speed of motors is set to 0
+              delay(2000);
+              
+              digitalWrite(motor2, HIGH);//motor 1 BACK
+              digitalWrite(motor1, LOW);
+              digitalWrite(motor4, HIGH);//motor 2 BACK
+              digitalWrite(motor3, LOW);
+              analogWrite(ENA, SPEED);
+
+              delay(back_time);
+              digitalWrite(motor1, LOW);//motor 1 STOP
+              digitalWrite(motor2, LOW);
+              digitalWrite(motor3, LOW);//motor 2 STOP
+              digitalWrite(motor4, LOW);
+              analogWrite(ENA, 0);}
+
+      }
+
+      default:{
+        int state=0;
+        while(state==0){
+        digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on
+        delay(1000);                       // wait for one second
+        digitalWrite(LED_BUILTIN, LOW);    // turn the LED off
+        delay(1000);                       // wait for one second
+        }
+
+        break;}
+
+  }
+
+}
+
